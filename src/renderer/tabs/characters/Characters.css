@@ -1,0 +1,373 @@
+/* -- Characters Tab Layout -- */
+
+.characters-container {
+    display: flex;
+    flex-direction: row;
+    flex-grow: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* -- Main grid area (scrollable) -- */
+
+.grid-area {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* -- Toolbar -- */
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    gap: 6px;
+    background-color: var(--roa-grey3);
+    border-bottom: 1px solid var(--roa-grey1);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.toolbar input[type=text] {
+    width: 180px;
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 24px;
+    background-color: var(--roa-grey5);
+    margin: 0 4px;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+/* -- Grid scroll container -- */
+
+.grid-scroll {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 12px 16px 40px 16px;
+}
+
+/* -- Category bundle -- */
+
+.category-bundle {
+    margin-bottom: 20px;
+}
+
+.category-header {
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    background-color: var(--roa-grey2);
+    border-radius: 4px 4px 0 0;
+    border-left: 3px solid var(--roa-accent1);
+    margin-bottom: 0;
+    user-select: none;
+}
+
+.category-title {
+    font-weight: bold;
+    font-size: 11pt;
+    flex-grow: 1;
+}
+
+.category-count {
+    font-size: 9pt;
+    color: var(--roa-white1);
+    margin-right: 8px;
+}
+
+.category-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+/* -- Pages wrapper (holds all 4x4 pages for one category) -- */
+
+.category-pages {
+    background-color: var(--roa-grey3);
+    border-radius: 0 0 4px 4px;
+    border-left: 3px solid var(--roa-grey5);
+    padding: 8px 8px 4px 8px;
+}
+
+/* -- Single 4x4 page -- */
+
+.page-grid {
+    display: inline-block;
+    vertical-align: top;
+    margin: 0 10px 8px 0;
+    background-color: var(--roa-grey4);
+    border-radius: 3px;
+    padding: 4px;
+    border: 1px solid var(--roa-grey1);
+}
+
+.page-label {
+    text-align: center;
+    font-size: 8pt;
+    color: var(--roa-white1);
+    padding: 2px 0;
+    user-select: none;
+}
+
+.page-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.page-row {
+    display: flex;
+    gap: 2px;
+}
+
+/* -- Single grid cell -- */
+
+.grid-cell {
+    width: 62px;
+    height: 62px;
+    position: relative;
+    background-color: var(--roa-grey1);
+    border-radius: 2px;
+    cursor: pointer;
+    user-select: none;
+    overflow: hidden;
+    transition: background-color 0.1s;
+}
+
+.grid-cell:hover {
+    background-color: var(--roa-grey5);
+}
+
+.grid-cell-empty {
+    cursor: default;
+    background-color: var(--roa-grey2);
+    border: 1px dashed var(--roa-grey5);
+}
+
+.grid-cell-empty:hover {
+    background-color: var(--roa-grey2);
+}
+
+/* -- Character cell content -- */
+
+.cell-mug {
+    display: block;
+    width: 100%;
+    height: 42px;
+    object-fit: cover;
+    image-rendering: pixelated;
+    pointer-events: none;
+}
+
+.cell-name {
+    display: block;
+    font-size: 7.5pt;
+    text-align: center;
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    padding: 0 2px;
+    line-height: 1.4;
+    color: var(--roa-white2);
+    pointer-events: none;
+}
+
+.cell-author {
+    display: block;
+    font-size: 6.5pt;
+    text-align: center;
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    padding: 0 2px;
+    color: var(--roa-white1);
+    pointer-events: none;
+}
+
+/* -- Selection overlay -- */
+
+.grid-cell.selected {
+    outline: 2px solid var(--roa-accent1);
+    outline-offset: -2px;
+    z-index: 1;
+}
+
+.grid-cell.selected::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(224, 64, 64, 0.15);
+    pointer-events: none;
+}
+
+/* -- Drag-over indicator -- */
+
+.grid-cell.drag-over-left::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 3px;
+    background-color: var(--roa-accent1);
+    z-index: 10;
+}
+
+.grid-cell.drag-over-on {
+    outline: 2px solid var(--roa-accent1);
+    outline-offset: -2px;
+}
+
+/* -- Dragging state -- */
+
+.grid-cell[draggable=true] {
+    cursor: grab;
+}
+
+.grid-cell[draggable=true]:active {
+    cursor: grabbing;
+}
+
+/* -- Pool / sidebar (excluded characters) -- */
+
+.pool-panel {
+    width: 260px;
+    min-width: 220px;
+    background-color: var(--roa-grey3);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    border-left: 1px solid var(--roa-grey1);
+}
+
+.pool-header {
+    padding: 6px 10px;
+    font-size: 10pt;
+    font-weight: bold;
+    color: var(--roa-white1);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background-color: var(--roa-grey2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pool-header input[type=text] {
+    flex-grow: 1;
+    font-size: 9pt;
+    height: 24px;
+}
+
+.pool-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    gap: 4px;
+}
+
+.pool-char {
+    width: 62px;
+    position: relative;
+    cursor: grab;
+    user-select: none;
+    border-radius: 2px;
+    overflow: hidden;
+    background-color: var(--roa-grey1);
+}
+
+.pool-char:hover {
+    background-color: var(--roa-grey5);
+}
+
+.pool-char.selected {
+    outline: 2px solid var(--roa-accent1);
+    outline-offset: -2px;
+}
+
+.pool-char.selected::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(224, 64, 64, 0.15);
+    pointer-events: none;
+}
+
+.pool-mug {
+    display: block;
+    width: 100%;
+    height: 42px;
+    object-fit: cover;
+    image-rendering: pixelated;
+    pointer-events: none;
+}
+
+.pool-name {
+    display: block;
+    font-size: 7pt;
+    text-align: center;
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    padding: 1px 2px;
+    color: var(--roa-white2);
+    pointer-events: none;
+}
+
+/* -- Save indicator -- */
+
+.dirty-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--roa-accent1);
+    margin-left: 6px;
+}
+
+/* -- Empty state -- */
+
+.empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+    color: var(--roa-white1);
+    font-size: 12pt;
+}
+
+/* -- DnD mode buttons -- */
+
+.dnd-mode-btn {
+    font-size: 8.5pt;
+    padding: 3px 8px;
+    margin: 0 1px;
+    border-radius: 3px;
+}
+
+.dnd-mode-btn.active {
+    background-color: var(--roa-accent1);
+    border-color: var(--roa-accent2);
+    color: white;
+}
+
+/* -- Add category button -- */
+
+.add-category-area {
+    padding: 8px 16px;
+    flex-shrink: 0;
+}
