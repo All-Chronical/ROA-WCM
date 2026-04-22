@@ -316,12 +316,13 @@ export function unzipCategoriesToRoa(
     const categories: RoaCategory[] = [];
 
     for (const group of categoryGroups) {
-        if (group.characters.length < 1) continue;
+        const chars = group.characters.filter((c) => c.type === "characters");
+        if (chars.length < 1) continue;
         categories.push({
             index: characterPaths.length,
             label: group.name,
         });
-        for (const char of group.characters) {
+        for (const char of chars) {
             characterPaths.push(char.rawPath);
         }
     }
