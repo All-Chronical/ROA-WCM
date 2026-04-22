@@ -33,6 +33,10 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
     // Drag state
     const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
+    // Category editing state
+    const [newCatName, setNewCatName] = useState<string | null>(null);
+    const [renamingCat, setRenamingCat] = useState<{ index: number; name: string } | null>(null);
+
     const categoriesRef = useRef(categories);
     categoriesRef.current = categories;
 
@@ -341,6 +345,45 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
     }
 
 
+    // -- Category operations --
+
+    function addCategory(): void {
+        setNewCatName("");
+    }
+
+    function commitAddCategory(): void {
+        if (newCatName === null) return;
+        const trimmed = newCatName.trim();
+        if (!trimmed) { setNewCatName(null); return; }
+        if (categories.some((c) => c.name === trimmed)) {
+            log(`Category "${trimmed}" already exists`);
+            return;
+        }
+        updateCategories([...categories, { name: trimmed, characters: [] }]);
+        log(`Added category: ${trimmed}`);
+        setNewCatName(null);
+    }
+
+    function renameCategory(catIndex: number): void {
+        setRenamingCat({ index: catIndex, name: categories[catIndex].name });
+    }
+
+    function commitRenameCategory(): void {
+        if (renamingCat === null) return;
+        const trimmed = renamingCat.name.trim();
+        if (!trimmed || trimmed === categories[renamingCat.index].name) {
+            setRenamingCat(null);
+            return;
+        }
+        if (categories.some((c) => c.name === trimmed)) {
+            log(`Category "${trimmed}" already exists`);
+            return;
+        }
+        updateCategories(categories.map((c, i) => i === renamingCat.index ? { ...c, name: trimmed } : c));
+        log(`Renamed to: ${trimmed}`);
+        setRenamingCat(null);
+    }
+
     // -- Context menu actions for cells --
 
     function openFolder(char: RoaCharacter): void {
@@ -384,6 +427,25 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
                         <div style={{ flexGrow: 1 }} />
 
                         <div className="toolbar-group">
+                            {newCatName !== null ? (
+                                <input
+                                    autoFocus
+                                    className="inline-edit-input"
+                                    placeholder="Category name"
+                                    value={newCatName}
+                                    onChange={(e) => setNewCatName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") commitAddCategory();
+                                        if (e.key === "Escape") setNewCatName(null);
+                                    }}
+                                    onBlur={() => commitAddCategory()}
+                                />
+                            ) : (
+                                <button className="icon-btn" onClick={addCategory} title="Add category">
+                                    <span className="material-icons">New category</span>
+                                </button>
+                            )}
+                            <div className="toolbar-separator" />
                             <button className="icon-btn" onClick={async () => {
                                 const dir = await api.getRoaDirectory();
                                 api.openDirectory(dir);
@@ -424,6 +486,11 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
                                     onDragOver={handleDragOver}
                                     onDragLeave={handleDragLeave}
                                     onDrop={handleDrop}
+                                    onRename={renameCategory}
+                                    renamingCat={renamingCat}
+                                    onRenamingChange={(name) => setRenamingCat(renamingCat ? { ...renamingCat, name } : null)}
+                                    onRenameCommit={commitRenameCategory}
+                                    onRenameCancel={() => setRenamingCat(null)}
                                     onOpenFolder={openFolder}
                                     cellKey={cellKey}
                                 />
@@ -464,6 +531,11 @@ function CategoryBundle({
     onDragOver,
     onDragLeave,
     onDrop,
+    onRename,
+    renamingCat,
+    onRenamingChange,
+    onRenameCommit,
+    onRenameCancel,
     onOpenFolder,
     cellKey: cellKeyFn,
 }: {
@@ -477,14 +549,43 @@ function CategoryBundle({
     onDragOver: (e: React.DragEvent, catIndex: number, charIndex: number) => void;
     onDragLeave: () => void;
     onDrop: (e: React.DragEvent, toCatIndex: number, toCharIndex: number) => void;
+    onRename: (catIndex: number) => void;
+    renamingCat: { index: number; name: string } | null;
+    onRenamingChange: (name: string) => void;
+    onRenameCommit: () => void;
+    onRenameCancel: () => void;
     onOpenFolder: (char: RoaCharacter) => void;
     cellKey: (catIndex: number, charIndex: number) => string;
 }): JSX.Element {
+    const isRenaming = renamingCat !== null && renamingCat.index === bundle.catIndex;
     return (
         <div className="category-bundle" onClick={(e) => e.stopPropagation()}>
             <div className="category-header">
-                <span className="category-title">{bundle.catName}</span>
-                <span className="category-count">{bundle.charCount} characters</span>
+                {isRenaming ? (
+                    <input
+                        autoFocus
+                        className="inline-edit-input"
+                        value={renamingCat!.name}
+                        onChange={(e) => onRenamingChange(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") onRenameCommit();
+                            if (e.key === "Escape") onRenameCancel();
+                        }}
+                        onBlur={() => onRenameCommit()}
+                    />
+                ) : (
+                    <>
+                        <span className="category-title">{bundle.catName}</span>
+                        <span className="category-count">{bundle.charCount} characters</span>
+                        <button
+                            className="icon-btn"
+                            onClick={() => onRename(bundle.catIndex)}
+                            title="Rename category"
+                        >
+                            <span className="material-icons" style={{ fontSize: 16 }}>edit</span>
+                        </button>
+                    </>
+                )}
             </div>
             <div
                 className="category-pages"
