@@ -39,10 +39,27 @@ export function loadFromDisk(): void {
     orderGroups.stages = pruneDeletedEntries(orderGroups.stages);
     orderGroups.skins = pruneDeletedEntries(orderGroups.skins);
 
-    // Scan for new entries
-    const roaDir = getRoaDir();
-    const newChars = scanForNewEntries(orderGroups.characters, roaDir);
-    orderGroups.characters.push(...newChars);
+    // Collect all known paths across every group so that entries
+    // already tracked in buddies/stages/skins are not misclassified
+    // as new characters.
+    const allKnown = [
+        ...orderGroups.characters,
+        ...orderGroups.buddies,
+        ...orderGroups.stages,
+        ...orderGroups.skins,
+    ];
+
+    // Scan for truly new entries and classify by config.ini type
+    const newEntries = scanForNewEntries(allKnown, getRoaDir());
+    for (const entry of newEntries) {
+        const info = parseRoaEntry(entry);
+        switch (info.type) {
+            case "characters": orderGroups.characters.push(entry); break;
+            case "buddies":    orderGroups.buddies.push(entry);    break;
+            case "stages":     orderGroups.stages.push(entry);     break;
+            case "skins":      orderGroups.skins.push(entry);      break;
+        }
+    }
 }
 
 export function getCharacterCategories(): CategoryWithCharacters[] {

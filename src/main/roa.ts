@@ -293,10 +293,12 @@ export function zipCharactersWithCategories(
         if (catsByIndex.has(i)) {
             currentCategory = catsByIndex.get(i)!;
         }
+        const entry = parseRoaEntry(characterPaths[i]);
+        if (entry.type !== "characters") continue;
         if (!result.has(currentCategory)) {
             result.set(currentCategory, []);
         }
-        result.get(currentCategory)!.push(parseRoaEntry(characterPaths[i]));
+        result.get(currentCategory)!.push(entry);
     }
 
     return Array.from(result.entries()).map(([name, characters]) => ({
