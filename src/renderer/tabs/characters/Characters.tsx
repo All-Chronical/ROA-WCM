@@ -469,7 +469,11 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
                     </div>
 
                     {/* Scrollable grid */}
-                    <div className="grid-scroll" onClick={() => setSelected(new Set<string>())}>
+                    <div
+                        className="grid-scroll"
+                        onClick={() => setSelected(new Set<string>())}
+                        onDragOver={(e) => e.preventDefault()}
+                    >
                         {bundles.length === 0 ? (
                             <div className="empty-state">No categories loaded</div>
                         ) : (
