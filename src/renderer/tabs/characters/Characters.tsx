@@ -442,7 +442,7 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
                                 />
                             ) : (
                                 <button className="icon-btn" onClick={addCategory} title="Add category">
-                                    <span className="material-icons">New category</span>
+                                    <span>New category</span>
                                 </button>
                             )}
                             <div className="toolbar-separator" />
@@ -450,7 +450,7 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
                                 const dir = await api.getRoaDirectory();
                                 api.openDirectory(dir);
                             }} title="Open ROA folder">
-                                <span className="material-icons">Open order dir</span>
+                                <span>Open order dir</span>
                             </button>
                             <div className="toolbar-separator" />
                             <button className="icon-btn" onClick={handleReload} title="Reload from disk">
