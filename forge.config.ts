@@ -14,6 +14,11 @@ const config: ForgeConfig = {
   ],
   plugins: [
     new WebpackPlugin({
+      devContentSecurityPolicy:
+        "default-src 'self' 'unsafe-inline' 'unsafe-eval' data:; " +
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        "font-src 'self' https://fonts.gstatic.com; " +
+        "img-src 'self' img: data:;",
       mainConfig,
       renderer: {
         config: rendererConfig,
