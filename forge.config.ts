@@ -7,6 +7,8 @@ import { rendererConfig } from "./webpack.renderer.config";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    // Extension omitted: packager resolves icon.ico (win32) / icon.png (linux)
+    icon: "./assets/icon",
   },
   makers: [
     {
