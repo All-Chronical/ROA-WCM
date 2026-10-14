@@ -61,6 +61,38 @@
     margin-bottom: 20px;
 }
 
+.category-bundle.dragging {
+    opacity: 0.5;
+}
+
+/* -- Category reorder drop indicators -- */
+
+.category-bundle.drop-above {
+    box-shadow: 0 -3px 0 0 var(--roa-accent1);
+}
+
+.category-bundle.drop-below {
+    box-shadow: 0 3px 0 0 var(--roa-accent1);
+}
+
+/* -- Category drag handle -- */
+
+.category-drag-handle {
+    cursor: grab;
+    color: var(--roa-white1);
+    padding: 2px;
+    border-radius: 3px;
+}
+
+.category-drag-handle:hover {
+    color: var(--roa-white2);
+    background-color: var(--roa-grey4);
+}
+
+.category-drag-handle:active {
+    cursor: grabbing;
+}
+
 .category-header {
     display: flex;
     align-items: center;

@@ -10,6 +10,15 @@ const ROWS = 4;
 
 type DndMode = "insert" | "swap";
 
+// Custom drag payload type for reordering categories; grid cell drags use "text/plain".
+// A distinct MIME type lets dragover handlers tell the two drag kinds apart
+// (dataTransfer.getData is unreadable during dragover).
+const CATEGORY_DRAG_TYPE = "application/x-roa-category";
+
+function isCategoryDrag(e: React.DragEvent): boolean {
+    return e.dataTransfer.types.includes(CATEGORY_DRAG_TYPE);
+}
+
 // Unique key for a cell: "categoryIndex:charIndex" for filled, "categoryIndex:empty:pageLocalIndex" for empty
 interface CellAddress {
     categoryIndex: number;
@@ -39,6 +48,10 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
 
     // Collapsed categories: set of categoryIndex
     const [collapsedCategories, setCollapsedCategories] = useState<Set<number>>(new Set<number>());
+
+    // Category reorder drag state
+    const [dragCategoryIndex, setDragCategoryIndex] = useState<number | null>(null);
+    const [dragOverCategory, setDragOverCategory] = useState<{ index: number; above: boolean } | null>(null);
 
     const categoriesRef = useRef(categories);
     categoriesRef.current = categories;
@@ -349,6 +362,102 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
     }
 
 
+    // -- Category reorder drag & drop --
+
+    function handleCategoryDragStart(e: React.DragEvent, categoryIndex: number): void {
+        const payload = JSON.stringify({ type: "category", categoryIndex });
+        e.dataTransfer.setData(CATEGORY_DRAG_TYPE, payload);
+        // A standard type is also set so the drag initiates reliably
+        e.dataTransfer.setData("text/plain", payload);
+        e.dataTransfer.effectAllowed = "move";
+        setDragCategoryIndex(categoryIndex);
+    }
+
+    function handleCategoryDragEnd(): void {
+        setDragCategoryIndex(null);
+        setDragOverCategory(null);
+    }
+
+    function handleCategoryDragOver(e: React.DragEvent, toCategoryIndex: number): void {
+        if (!isCategoryDrag(e)) return; // let grid cell drags pass through
+        if (dragCategoryIndex === null || dragCategoryIndex === toCategoryIndex) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const above = e.clientY < rect.top + rect.height / 2;
+        setDragOverCategory((prev) =>
+            prev && prev.index === toCategoryIndex && prev.above === above
+                ? prev
+                : { index: toCategoryIndex, above }
+        );
+    }
+
+    function handleCategoryDragLeave(e: React.DragEvent): void {
+        if (!isCategoryDrag(e)) return;
+        // Only clear when the pointer truly leaves this bundle,
+        // not when moving between the bundle's own child elements
+        if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+            setDragOverCategory(null);
+        }
+    }
+
+    function handleCategoryDrop(e: React.DragEvent, toCategoryIndex: number): void {
+        let raw = e.dataTransfer.getData(CATEGORY_DRAG_TYPE);
+        if (!raw) raw = e.dataTransfer.getData("text/plain");
+        if (!raw) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setDragOverCategory(null);
+        setDragCategoryIndex(null);
+
+        let data: any;
+        try { data = JSON.parse(raw); } catch { return; }
+        if (data.type !== "category" || typeof data.categoryIndex !== "number") return;
+        const fromCategoryIndex = data.categoryIndex;
+        if (fromCategoryIndex === toCategoryIndex) return;
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const above = e.clientY < rect.top + rect.height / 2;
+        reorderCategories(fromCategoryIndex, toCategoryIndex, above);
+    }
+
+    // Move the category at fromIndex to above/below the category at toIndex
+    function reorderCategories(fromIndex: number, toIndex: number, above: boolean): void {
+        if (fromIndex < 0 || fromIndex >= categories.length) return;
+        if (toIndex < 0 || toIndex >= categories.length) return;
+        if (fromIndex === toIndex) return;
+
+        // Final-array insertion index; the -1 compensates for the removal
+        // shifting items that sit between fromIndex and the target
+        const effectiveTarget = above ? toIndex : toIndex + 1;
+        const insertAt = fromIndex < effectiveTarget ? effectiveTarget - 1 : effectiveTarget;
+
+        const newCategories = [...categories];
+        const [moved] = newCategories.splice(fromIndex, 1);
+        newCategories.splice(insertAt, 0, moved);
+        updateCategories(newCategories);
+
+        // Remap index-keyed UI state so it follows the moved category
+        const remap = (i: number): number => {
+            if (i === fromIndex) return insertAt;
+            if (fromIndex < insertAt && i > fromIndex && i <= insertAt) return i - 1;
+            if (fromIndex > insertAt && i >= insertAt && i < fromIndex) return i + 1;
+            return i;
+        };
+        setCollapsedCategories((prev) => {
+            const next = new Set<number>();
+            for (const i of prev) next.add(remap(i));
+            return next;
+        });
+        if (renamingCategory) {
+            setRenamingCategory({ ...renamingCategory, index: remap(renamingCategory.index) });
+        }
+
+        // Selection keys are "categoryIndex:charIndex" and are now stale
+        setSelected(new Set<string>());
+        setLastSelected(null);
+        log(`Moved category "${moved.name}"`);
+    }
+
     // -- Category operations --
 
     function addCategory(): void {
@@ -515,6 +624,17 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
                                     onRenameCancel={() => setRenamingCategory(null)}
                                     onOpenFolder={openFolder}
                                     cellKey={cellKey}
+                                    dragCategoryIndex={dragCategoryIndex}
+                                    dragOverCategory={
+                                        dragOverCategory && dragOverCategory.index === bundle.categoryIndex
+                                            ? dragOverCategory
+                                            : null
+                                    }
+                                    onCategoryDragStart={handleCategoryDragStart}
+                                    onCategoryDragEnd={handleCategoryDragEnd}
+                                    onCategoryDragOver={handleCategoryDragOver}
+                                    onCategoryDragLeave={handleCategoryDragLeave}
+                                    onCategoryDrop={handleCategoryDrop}
                                 />
                             ))
                         )}
@@ -562,6 +682,13 @@ function CategoryBundle({
     onRenameCancel,
     onOpenFolder,
     cellKey: cellKeyFn,
+    dragCategoryIndex,
+    dragOverCategory,
+    onCategoryDragStart,
+    onCategoryDragEnd,
+    onCategoryDragOver,
+    onCategoryDragLeave,
+    onCategoryDrop,
 }: {
     bundle: CategoryBundleData;
     categories: CategoryWithCharacters[];
@@ -582,10 +709,34 @@ function CategoryBundle({
     onRenameCancel: () => void;
     onOpenFolder: (char: RoaCharacter) => void;
     cellKey: (categoryIndex: number, charIndex: number) => string;
+    dragCategoryIndex: number | null;
+    dragOverCategory: { index: number; above: boolean } | null;
+    onCategoryDragStart: (e: React.DragEvent, categoryIndex: number) => void;
+    onCategoryDragEnd: () => void;
+    onCategoryDragOver: (e: React.DragEvent, categoryIndex: number) => void;
+    onCategoryDragLeave: (e: React.DragEvent) => void;
+    onCategoryDrop: (e: React.DragEvent, categoryIndex: number) => void;
 }): JSX.Element {
     const isRenaming = renamingCategory !== null && renamingCategory.index === bundle.categoryIndex;
+    const isDragging = dragCategoryIndex === bundle.categoryIndex;
+    const dragAbove = dragOverCategory !== null && dragOverCategory.above;
+    const dragBelow = dragOverCategory !== null && !dragOverCategory.above;
     return (
-        <div className={`category-bundle ${isCollapsed ? "collapsed" : ""}`} onClick={(e) => e.stopPropagation()}>
+        <div
+            className={[
+                "category-bundle",
+                isCollapsed ? "collapsed" : "",
+                isDragging ? "dragging" : "",
+                dragAbove ? "drop-above" : "",
+                dragBelow ? "drop-below" : "",
+            ]
+                .filter(Boolean)
+                .join(" ")}
+            onClick={(e) => e.stopPropagation()}
+            onDragOver={(e) => onCategoryDragOver(e, bundle.categoryIndex)}
+            onDragLeave={(e) => onCategoryDragLeave(e)}
+            onDrop={(e) => onCategoryDrop(e, bundle.categoryIndex)}
+        >
             <div className="category-header">
                 {isRenaming ? (
                     <input
@@ -617,6 +768,15 @@ function CategoryBundle({
                         >
                             <span className="material-icons" style={{ fontSize: 16 }}>edit</span>
                         </button>
+                        <span
+                            className="category-drag-handle material-icons"
+                            title="Drag to reorder category"
+                            draggable
+                            onDragStart={(e) => onCategoryDragStart(e, bundle.categoryIndex)}
+                            onDragEnd={onCategoryDragEnd}
+                        >
+                            drag_indicator
+                        </span>
                     </>
                 )}
             </div>
@@ -624,10 +784,12 @@ function CategoryBundle({
                 <div
                     className="category-pages"
                     onDragOver={(e) => {
+                        if (isCategoryDrag(e)) return; // let category drags bubble to the bundle
                         e.preventDefault();
                         onDragOver(e, bundle.categoryIndex, categories[bundle.categoryIndex].characters.length);
                     }}
                     onDrop={(e) => {
+                        if (isCategoryDrag(e)) return;
                         onDrop(e, bundle.categoryIndex, categories[bundle.categoryIndex].characters.length);
                     }}
                 >
@@ -718,15 +880,18 @@ function PageGrid({
                                         key={key}
                                         className={`grid-cell grid-cell-empty ${isDragTarget ? "drag-over-on" : ""}`}
                                         onDragOver={(e) => {
+                                            if (isCategoryDrag(e)) return; // let category drags bubble to the bundle
                                             e.preventDefault();
                                             e.stopPropagation();
                                             onDragOver(e, page.categoryIndex, charIndex);
                                         }}
                                         onDragLeave={(e) => {
+                                            if (isCategoryDrag(e)) return;
                                             e.stopPropagation();
                                             onDragLeave();
                                         }}
                                         onDrop={(e) => {
+                                            if (isCategoryDrag(e)) return;
                                             e.stopPropagation();
                                             onDrop(e, page.categoryIndex, charIndex);
                                         }}
@@ -755,15 +920,18 @@ function PageGrid({
                                     }}
                                     onDragStart={(e) => onDragStart(e, page.categoryIndex, charIndex)}
                                     onDragOver={(e) => {
+                                        if (isCategoryDrag(e)) return; // let category drags bubble to the bundle
                                         e.preventDefault();
                                         e.stopPropagation();
                                         onDragOver(e, page.categoryIndex, charIndex);
                                     }}
                                     onDragLeave={(e) => {
+                                        if (isCategoryDrag(e)) return;
                                         e.stopPropagation();
                                         onDragLeave();
                                     }}
                                     onDrop={(e) => {
+                                        if (isCategoryDrag(e)) return;
                                         e.stopPropagation();
                                         onDrop(e, page.categoryIndex, charIndex);
                                     }}
