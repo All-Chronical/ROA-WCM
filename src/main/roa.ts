@@ -281,17 +281,17 @@ export function zipCharactersWithCategories(
     characterPaths: string[],
     categories: RoaCategory[]
 ): CategoryWithCharacters[] {
-    const catsByIndex: Map<number, string> = new Map();
+    const categoriesByIndex: Map<number, string> = new Map();
     for (const c of categories) {
-        catsByIndex.set(c.index, c.label);
+        categoriesByIndex.set(c.index, c.label);
     }
 
     const result: Map<string, RoaCharacter[]> = new Map();
     let currentCategory = "unsorted";
 
     for (let i = 0; i < characterPaths.length; i++) {
-        if (catsByIndex.has(i)) {
-            currentCategory = catsByIndex.get(i)!;
+        if (categoriesByIndex.has(i)) {
+            currentCategory = categoriesByIndex.get(i)!;
         }
         const entry = parseRoaEntry(characterPaths[i]);
         if (entry.type !== "characters") continue;

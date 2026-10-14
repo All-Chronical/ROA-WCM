@@ -10,9 +10,9 @@ const ROWS = 4;
 
 type DndMode = "insert" | "swap";
 
-// Unique key for a cell: "catIndex:charIndex" for filled, "catIndex:empty:pageLocalIndex" for empty
+// Unique key for a cell: "categoryIndex:charIndex" for filled, "categoryIndex:empty:pageLocalIndex" for empty
 interface CellAddress {
-    catIndex: number;
+    categoryIndex: number;
     charIndex: number; // -1 for empty slots
 }
 
@@ -26,7 +26,7 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
     const [dndMode, setDndMode] = useState<DndMode>("insert");
     const [searchValue, setSearchValue] = useState("");
 
-    // Selection: set of "catIndex:charIndex" keys
+    // Selection: set of "categoryIndex:charIndex" keys
     const [selected, setSelected] = useState<Set<string>>(new Set<string>());
     const [lastSelected, setLastSelected] = useState<string | null>(null);
 
@@ -34,11 +34,11 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
     const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
     // Category editing state
-    const [newCatName, setNewCatName] = useState<string | null>(null);
-    const [renamingCat, setRenamingCat] = useState<{ index: number; name: string } | null>(null);
+    const [newCategoryName, setNewCategoryName] = useState<string | null>(null);
+    const [renamingCategory, setRenamingCategory] = useState<{ index: number; name: string } | null>(null);
 
-    // Collapsed categories: set of catIndex
-    const [collapsedCats, setCollapsedCats] = useState<Set<number>>(new Set<number>());
+    // Collapsed categories: set of categoryIndex
+    const [collapsedCategories, setCollapsedCategories] = useState<Set<number>>(new Set<number>());
 
     const categoriesRef = useRef(categories);
     categoriesRef.current = categories;
@@ -47,13 +47,13 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
 
     const loadData = useCallback(async () => {
         try {
-            const cats: CategoryWithCharacters[] = await api.getCharacterCategories();
-            setCategories(cats);
+            const loadedCategories: CategoryWithCharacters[] = await api.getCharacterCategories();
+            setCategories(loadedCategories);
             setSelected(new Set<string>());
             setLastSelected(null);
-            setCollapsedCats(new Set<number>());
+            setCollapsedCategories(new Set<number>());
             setIsDirty(false);
-            log(`Loaded ${cats.length} categories`);
+            log(`Loaded ${loadedCategories.length} categories`);
         } catch (err: any) {
             log(`Error loading: ${err.message}`);
         }
@@ -61,8 +61,8 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    function updateCategories(newCats: CategoryWithCharacters[]): void {
-        setCategories(newCats);
+    function updateCategories(newCategories: CategoryWithCharacters[]): void {
+        setCategories(newCategories);
         setIsDirty(true);
     }
 
@@ -87,19 +87,19 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
     // If a category has 20 chars: page 1 = 16, page 2 = 4 + 12 empty.
 
     interface PageData {
-        catIndex: number;
-        catName: string;
-        pageInCat: number;
-        totalPagesInCat: number;
+        categoryIndex: number;
+        categoryName: string;
+        pageInCategory: number;
+        totalPagesInCategory: number;
         cells: (RoaCharacter | null)[]; // length always 16, null = empty slot
         startCharIndex: number; // index of first char in this page within the category
     }
 
     function buildPages(): PageData[] {
         const pages: PageData[] = [];
-        for (let ci = 0; ci < categories.length; ci++) {
-            const cat = categories[ci];
-            const chars = cat.characters;
+        for (let categoryIndex = 0; categoryIndex < categories.length; categoryIndex++) {
+            const category = categories[categoryIndex];
+            const chars = category.characters;
             const totalPages = Math.max(1, Math.ceil(chars.length / PAGE_SIZE));
 
             for (let p = 0; p < totalPages; p++) {
@@ -110,10 +110,10 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
                     cells.push(i < slice.length ? slice[i] : null);
                 }
                 pages.push({
-                    catIndex: ci,
-                    catName: cat.name,
-                    pageInCat: p,
-                    totalPagesInCat: totalPages,
+                    categoryIndex: categoryIndex,
+                    categoryName: category.name,
+                    pageInCategory: p,
+                    totalPagesInCategory: totalPages,
                     cells,
                     startCharIndex: startIdx,
                 });
@@ -125,23 +125,23 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
     const allPages = buildPages();
 
     // Group pages by category for rendering category bundles
-    interface CatBundle {
-        catIndex: number;
-        catName: string;
+    interface CategoryBundleData {
+        categoryIndex: number;
+        categoryName: string;
         charCount: number;
         pages: PageData[];
     }
 
-    function buildBundles(): CatBundle[] {
-        const bundles: CatBundle[] = [];
-        let currentCi = -1;
+    function buildBundles(): CategoryBundleData[] {
+        const bundles: CategoryBundleData[] = [];
+        let currentCategoryIndex = -1;
         for (const page of allPages) {
-            if (page.catIndex !== currentCi) {
-                currentCi = page.catIndex;
+            if (page.categoryIndex !== currentCategoryIndex) {
+                currentCategoryIndex = page.categoryIndex;
                 bundles.push({
-                    catIndex: page.catIndex,
-                    catName: page.catName,
-                    charCount: categories[page.catIndex].characters.length,
+                    categoryIndex: page.categoryIndex,
+                    categoryName: page.categoryName,
+                    charCount: categories[page.categoryIndex].characters.length,
                     pages: [],
                 });
             }
@@ -154,20 +154,20 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
 
     // -- Cell key helpers --
 
-    function cellKey(catIndex: number, charIndex: number): string {
-        return `${catIndex}:${charIndex}`;
+    function cellKey(categoryIndex: number, charIndex: number): string {
+        return `${categoryIndex}:${charIndex}`;
     }
 
     function parseCellKey(key: string): CellAddress {
-        const [ci, chi] = key.split(":").map(Number);
-        return { catIndex: ci, charIndex: chi };
+        const [categoryIndex, charIndex] = key.split(":").map(Number);
+        return { categoryIndex, charIndex };
     }
 
     // -- Selection --
 
-    function handleCellClick(catIndex: number, charIndex: number, e: React.MouseEvent): void {
+    function handleCellClick(categoryIndex: number, charIndex: number, e: React.MouseEvent): void {
         if (charIndex < 0) return; // empty slot
-        const key = cellKey(catIndex, charIndex);
+        const key = cellKey(categoryIndex, charIndex);
 
         if (e.ctrlKey || e.metaKey) {
             setSelected((prev) => {
@@ -179,12 +179,12 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
         } else if (e.shiftKey && lastSelected) {
             // Range select within the same category
             const last = parseCellKey(lastSelected);
-            if (last.catIndex === catIndex) {
+            if (last.categoryIndex === categoryIndex) {
                 const lo = Math.min(last.charIndex, charIndex);
                 const hi = Math.max(last.charIndex, charIndex);
                 setSelected((prev) => {
                     const next = new Set(prev);
-                    for (let i = lo; i <= hi; i++) next.add(cellKey(catIndex, i));
+                    for (let i = lo; i <= hi; i++) next.add(cellKey(categoryIndex, i));
                     return next;
                 });
             } else {
@@ -199,8 +199,8 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
 
     // -- Drag & Drop --
 
-    function handleDragStart(e: React.DragEvent, catIndex: number, charIndex: number): void {
-        const key = cellKey(catIndex, charIndex);
+    function handleDragStart(e: React.DragEvent, categoryIndex: number, charIndex: number): void {
+        const key = cellKey(categoryIndex, charIndex);
         if (!selected.has(key)) {
             setSelected(new Set<string>([key]));
         }
@@ -208,17 +208,17 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
         e.dataTransfer.effectAllowed = "move";
     }
 
-    function handleDragOver(e: React.DragEvent, catIndex: number, charIndex: number): void {
+    function handleDragOver(e: React.DragEvent, categoryIndex: number, charIndex: number): void {
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
-        setDragOverKey(cellKey(catIndex, charIndex >= 0 ? charIndex : 9000 + catIndex));
+        setDragOverKey(cellKey(categoryIndex, charIndex >= 0 ? charIndex : 9000 + categoryIndex));
     }
 
     function handleDragLeave(): void {
         setDragOverKey(null);
     }
 
-    function handleDrop(e: React.DragEvent, toCatIndex: number, toCharIndex: number): void {
+    function handleDrop(e: React.DragEvent, toCategoryIndex: number, toCharIndex: number): void {
         e.preventDefault();
         setDragOverKey(null);
 
@@ -226,21 +226,21 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
         try { data = JSON.parse(e.dataTransfer.getData("text/plain")); } catch { return; }
 
         if (data.type === "grid") {
-            handleGridDrop(toCatIndex, toCharIndex);
+            handleGridDrop(toCategoryIndex, toCharIndex);
         }
     }
 
-    function handleGridDrop(toCatIndex: number, toCharIndex: number): void {
+    function handleGridDrop(toCategoryIndex: number, toCharIndex: number): void {
         if (selected.size === 0) return;
 
         // Collect all selected characters grouped by source category
         const selectedByCategory = new Map<number, number[]>();
         for (const key of Array.from(selected)) {
             const addr = parseCellKey(key);
-            if (!selectedByCategory.has(addr.catIndex)) {
-                selectedByCategory.set(addr.catIndex, []);
+            if (!selectedByCategory.has(addr.categoryIndex)) {
+                selectedByCategory.set(addr.categoryIndex, []);
             }
-            selectedByCategory.get(addr.catIndex)!.push(addr.charIndex);
+            selectedByCategory.get(addr.categoryIndex)!.push(addr.charIndex);
         }
 
         // Sort indices descending within each category for safe removal
@@ -250,39 +250,39 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
 
         // Gather the actual characters in order
         const movedChars: RoaCharacter[] = [];
-        for (const [ci, indices] of Array.from(selectedByCategory.entries())) {
+        for (const [categoryIndex, indices] of Array.from(selectedByCategory.entries())) {
             for (const idx of indices) {
-                movedChars.push(categories[ci].characters[idx]);
+                movedChars.push(categories[categoryIndex].characters[idx]);
             }
         }
 
         if (dndMode === "swap") {
             if (
                 toCharIndex >= 0 &&
-                toCharIndex < categories[toCatIndex].characters.length
+                toCharIndex < categories[toCategoryIndex].characters.length
             ) {
-                const newCats = categories.map((cat, ci) => ({ ...cat, characters: [...cat.characters] }));
+                const newCategories = categories.map((category, categoryIndex) => ({ ...category, characters: [...category.characters] }));
                 if (selected.size === 1) {
                     // Single swap
                     const fromAddr = parseCellKey(Array.from(selected)[0]);
-                    const fromChar = newCats[fromAddr.catIndex].characters[fromAddr.charIndex];
-                    const toChar = newCats[toCatIndex].characters[toCharIndex];
-                    newCats[fromAddr.catIndex].characters[fromAddr.charIndex] = toChar;
-                    newCats[toCatIndex].characters[toCharIndex] = fromChar;
+                    const fromChar = newCategories[fromAddr.categoryIndex].characters[fromAddr.charIndex];
+                    const toChar = newCategories[toCategoryIndex].characters[toCharIndex];
+                    newCategories[fromAddr.categoryIndex].characters[fromAddr.charIndex] = toChar;
+                    newCategories[toCategoryIndex].characters[toCharIndex] = fromChar;
                 } else {
                     // Multi-select swap: pairwise swap with consecutive target slots
                     const keys = Array.from(selected);
                     for (let i = 0; i < keys.length; i++) {
                         const targetIdx = toCharIndex + i;
-                        if (targetIdx >= newCats[toCatIndex].characters.length) break;
+                        if (targetIdx >= newCategories[toCategoryIndex].characters.length) break;
                         const fromAddr = parseCellKey(keys[i]);
-                        const fromChar = newCats[fromAddr.catIndex].characters[fromAddr.charIndex];
-                        const toChar = newCats[toCatIndex].characters[targetIdx];
-                        newCats[fromAddr.catIndex].characters[fromAddr.charIndex] = toChar;
-                        newCats[toCatIndex].characters[targetIdx] = fromChar;
+                        const fromChar = newCategories[fromAddr.categoryIndex].characters[fromAddr.charIndex];
+                        const toChar = newCategories[toCategoryIndex].characters[targetIdx];
+                        newCategories[fromAddr.categoryIndex].characters[fromAddr.charIndex] = toChar;
+                        newCategories[toCategoryIndex].characters[targetIdx] = fromChar;
                     }
                 }
-                updateCategories(newCats);
+                updateCategories(newCategories);
                 setSelected(new Set<string>());
                 log(`Swapped ${movedChars.length} character(s)`);
                 return;
@@ -291,34 +291,34 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
 
         // Insert mode: remove from source, insert at target
         // Build new categories: first remove all selected
-        let newCats = categories.map((cat, ci) => {
-            const removeSet = selectedByCategory.get(ci);
-            if (!removeSet) return { ...cat, characters: [...cat.characters] };
+        let newCategories = categories.map((category, categoryIndex) => {
+            const removeSet = selectedByCategory.get(categoryIndex);
+            if (!removeSet) return { ...category, characters: [...category.characters] };
             const removeIndices = new Set(removeSet);
             return {
-                ...cat,
-                characters: cat.characters.filter((_, i) => !removeIndices.has(i)),
+                ...category,
+                characters: category.characters.filter((_, i) => !removeIndices.has(i)),
             };
         });
 
         // Calculate adjusted target index (because we removed items that may shift the target)
         let adjustedIndex = toCharIndex;
-        const removedBefore = selectedByCategory.get(toCatIndex);
+        const removedBefore = selectedByCategory.get(toCategoryIndex);
         if (removedBefore) {
             const countBefore = removedBefore.filter((i: number) => i < toCharIndex).length;
             adjustedIndex = Math.max(0, toCharIndex - countBefore);
         }
 
         // Insert at target
-        newCats = newCats.map((cat, ci) => {
-            if (ci !== toCatIndex) return cat;
-            const newChars = [...cat.characters];
+        newCategories = newCategories.map((category, categoryIndex) => {
+            if (categoryIndex !== toCategoryIndex) return category;
+            const newChars = [...category.characters];
             const insertAt = Math.min(adjustedIndex, newChars.length);
             newChars.splice(insertAt, 0, ...movedChars);
-            return { ...cat, characters: newChars };
+            return { ...category, characters: newChars };
         });
 
-        updateCategories(newCats);
+        updateCategories(newCategories);
         setSelected(new Set<string>());
         log(`Moved ${movedChars.length} character(s)`);
     }
@@ -328,22 +328,22 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
         const selectedByCategory = new Map<number, Set<number>>();
         for (const key of Array.from(selected)) {
             const addr = parseCellKey(key);
-            if (!selectedByCategory.has(addr.catIndex)) {
-                selectedByCategory.set(addr.catIndex, new Set());
+            if (!selectedByCategory.has(addr.categoryIndex)) {
+                selectedByCategory.set(addr.categoryIndex, new Set());
             }
-            selectedByCategory.get(addr.catIndex)!.add(addr.charIndex);
+            selectedByCategory.get(addr.categoryIndex)!.add(addr.charIndex);
         }
 
-        const newCats = categories.map((cat, ci) => {
-            const removeSet = selectedByCategory.get(ci);
-            if (!removeSet) return cat;
+        const newCategories = categories.map((category, categoryIndex) => {
+            const removeSet = selectedByCategory.get(categoryIndex);
+            if (!removeSet) return category;
             return {
-                ...cat,
-                characters: cat.characters.filter((_, i) => !removeSet.has(i)),
+                ...category,
+                characters: category.characters.filter((_, i) => !removeSet.has(i)),
             };
         });
 
-        updateCategories(newCats);
+        updateCategories(newCategories);
         setSelected(new Set<string>());
         log(`Removed ${selected.size} character(s) from grid`);
     }
@@ -352,52 +352,52 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
     // -- Category operations --
 
     function addCategory(): void {
-        setNewCatName("");
+        setNewCategoryName("");
     }
 
     function commitAddCategory(): void {
-        if (newCatName === null) return;
-        const trimmed = newCatName.trim();
-        if (!trimmed) { setNewCatName(null); return; }
+        if (newCategoryName === null) return;
+        const trimmed = newCategoryName.trim();
+        if (!trimmed) { setNewCategoryName(null); return; }
         if (categories.some((c) => c.name === trimmed)) {
             log(`Category "${trimmed}" already exists`);
             return;
         }
         updateCategories([...categories, { name: trimmed, characters: [] }]);
         log(`Added category: ${trimmed}`);
-        setNewCatName(null);
+        setNewCategoryName(null);
     }
 
-    function toggleCatCollapsed(catIndex: number): void {
-        setCollapsedCats((prev) => {
+    function toggleCategoryCollapsed(categoryIndex: number): void {
+        setCollapsedCategories((prev) => {
             const next = new Set<number>(prev);
-            if (next.has(catIndex)) {
-                next.delete(catIndex);
+            if (next.has(categoryIndex)) {
+                next.delete(categoryIndex);
             } else {
-                next.add(catIndex);
+                next.add(categoryIndex);
             }
             return next;
         });
     }
 
-    function renameCategory(catIndex: number): void {
-        setRenamingCat({ index: catIndex, name: categories[catIndex].name });
+    function renameCategory(categoryIndex: number): void {
+        setRenamingCategory({ index: categoryIndex, name: categories[categoryIndex].name });
     }
 
     function commitRenameCategory(): void {
-        if (renamingCat === null) return;
-        const trimmed = renamingCat.name.trim();
-        if (!trimmed || trimmed === categories[renamingCat.index].name) {
-            setRenamingCat(null);
+        if (renamingCategory === null) return;
+        const trimmed = renamingCategory.name.trim();
+        if (!trimmed || trimmed === categories[renamingCategory.index].name) {
+            setRenamingCategory(null);
             return;
         }
         if (categories.some((c) => c.name === trimmed)) {
             log(`Category "${trimmed}" already exists`);
             return;
         }
-        updateCategories(categories.map((c, i) => i === renamingCat.index ? { ...c, name: trimmed } : c));
+        updateCategories(categories.map((c, i) => i === renamingCategory.index ? { ...c, name: trimmed } : c));
         log(`Renamed to: ${trimmed}`);
-        setRenamingCat(null);
+        setRenamingCategory(null);
     }
 
     // -- Context menu actions for cells --
@@ -443,16 +443,16 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
                         <div style={{ flexGrow: 1 }} />
 
                         <div className="toolbar-group">
-                            {newCatName !== null ? (
+                            {newCategoryName !== null ? (
                                 <input
                                     autoFocus
                                     className="inline-edit-input"
                                     placeholder="Category name"
-                                    value={newCatName}
-                                    onChange={(e) => setNewCatName(e.target.value)}
+                                    value={newCategoryName}
+                                    onChange={(e) => setNewCategoryName(e.target.value)}
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter") commitAddCategory();
-                                        if (e.key === "Escape") setNewCatName(null);
+                                        if (e.key === "Escape") setNewCategoryName(null);
                                     }}
                                     onBlur={() => commitAddCategory()}
                                 />
@@ -495,7 +495,7 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
                         ) : (
                             bundles.map((bundle) => (
                                 <CategoryBundle
-                                    key={bundle.catIndex}
+                                    key={bundle.categoryIndex}
                                     bundle={bundle}
                                     categories={categories}
                                     selected={selected}
@@ -507,12 +507,12 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
                                     onDragLeave={handleDragLeave}
                                     onDrop={handleDrop}
                                     onRename={renameCategory}
-                                    isCollapsed={collapsedCats.has(bundle.catIndex)}
-                                    onToggleCollapse={() => toggleCatCollapsed(bundle.catIndex)}
-                                    renamingCat={renamingCat}
-                                    onRenamingChange={(name) => setRenamingCat(renamingCat ? { ...renamingCat, name } : null)}
+                                    isCollapsed={collapsedCategories.has(bundle.categoryIndex)}
+                                    onToggleCollapse={() => toggleCategoryCollapsed(bundle.categoryIndex)}
+                                    renamingCategory={renamingCategory}
+                                    onRenamingChange={(name) => setRenamingCategory(renamingCategory ? { ...renamingCategory, name } : null)}
                                     onRenameCommit={commitRenameCategory}
-                                    onRenameCancel={() => setRenamingCat(null)}
+                                    onRenameCancel={() => setRenamingCategory(null)}
                                     onOpenFolder={openFolder}
                                     cellKey={cellKey}
                                 />
@@ -528,15 +528,15 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
 
 // -- Category Bundle Component --
 
-interface CatBundle {
-    catIndex: number;
-    catName: string;
+interface CategoryBundleData {
+    categoryIndex: number;
+    categoryName: string;
     charCount: number;
     pages: {
-        catIndex: number;
-        catName: string;
-        pageInCat: number;
-        totalPagesInCat: number;
+        categoryIndex: number;
+        categoryName: string;
+        pageInCategory: number;
+        totalPagesInCategory: number;
         cells: (RoaCharacter | null)[];
         startCharIndex: number;
     }[];
@@ -556,34 +556,34 @@ function CategoryBundle({
     onRename,
     isCollapsed,
     onToggleCollapse,
-    renamingCat,
+    renamingCategory,
     onRenamingChange,
     onRenameCommit,
     onRenameCancel,
     onOpenFolder,
     cellKey: cellKeyFn,
 }: {
-    bundle: CatBundle;
+    bundle: CategoryBundleData;
     categories: CategoryWithCharacters[];
     selected: Set<string>;
     dragOverKey: string | null;
     dndMode: DndMode;
-    onCellClick: (catIndex: number, charIndex: number, e: React.MouseEvent) => void;
-    onDragStart: (e: React.DragEvent, catIndex: number, charIndex: number) => void;
-    onDragOver: (e: React.DragEvent, catIndex: number, charIndex: number) => void;
+    onCellClick: (categoryIndex: number, charIndex: number, e: React.MouseEvent) => void;
+    onDragStart: (e: React.DragEvent, categoryIndex: number, charIndex: number) => void;
+    onDragOver: (e: React.DragEvent, categoryIndex: number, charIndex: number) => void;
     onDragLeave: () => void;
-    onDrop: (e: React.DragEvent, toCatIndex: number, toCharIndex: number) => void;
-    onRename: (catIndex: number) => void;
+    onDrop: (e: React.DragEvent, toCategoryIndex: number, toCharIndex: number) => void;
+    onRename: (categoryIndex: number) => void;
     isCollapsed: boolean;
     onToggleCollapse: () => void;
-    renamingCat: { index: number; name: string } | null;
+    renamingCategory: { index: number; name: string } | null;
     onRenamingChange: (name: string) => void;
     onRenameCommit: () => void;
     onRenameCancel: () => void;
     onOpenFolder: (char: RoaCharacter) => void;
-    cellKey: (catIndex: number, charIndex: number) => string;
+    cellKey: (categoryIndex: number, charIndex: number) => string;
 }): JSX.Element {
-    const isRenaming = renamingCat !== null && renamingCat.index === bundle.catIndex;
+    const isRenaming = renamingCategory !== null && renamingCategory.index === bundle.categoryIndex;
     return (
         <div className={`category-bundle ${isCollapsed ? "collapsed" : ""}`} onClick={(e) => e.stopPropagation()}>
             <div className="category-header">
@@ -591,7 +591,7 @@ function CategoryBundle({
                     <input
                         autoFocus
                         className="inline-edit-input"
-                        value={renamingCat!.name}
+                        value={renamingCategory!.name}
                         onChange={(e) => onRenamingChange(e.target.value)}
                         onKeyDown={(e) => {
                             if (e.key === "Enter") onRenameCommit();
@@ -608,11 +608,11 @@ function CategoryBundle({
                         >
                             <span className="material-icons">expand_more</span>
                         </button>
-                        <span className="category-title">{bundle.catName}</span>
+                        <span className="category-title">{bundle.categoryName}</span>
                         <span className="category-count">{bundle.charCount} characters</span>
                         <button
                             className="icon-btn"
-                            onClick={() => onRename(bundle.catIndex)}
+                            onClick={() => onRename(bundle.categoryIndex)}
                             title="Rename category"
                         >
                             <span className="material-icons" style={{ fontSize: 16 }}>edit</span>
@@ -625,10 +625,10 @@ function CategoryBundle({
                     className="category-pages"
                     onDragOver={(e) => {
                         e.preventDefault();
-                        onDragOver(e, bundle.catIndex, categories[bundle.catIndex].characters.length);
+                        onDragOver(e, bundle.categoryIndex, categories[bundle.categoryIndex].characters.length);
                     }}
                     onDrop={(e) => {
-                        onDrop(e, bundle.catIndex, categories[bundle.catIndex].characters.length);
+                        onDrop(e, bundle.categoryIndex, categories[bundle.categoryIndex].characters.length);
                     }}
                 >
                     {bundle.pages.map((page, pi) => (
@@ -669,22 +669,22 @@ function PageGrid({
     cellKey: cellKeyFn,
 }: {
     page: {
-        catIndex: number;
-        pageInCat: number;
-        totalPagesInCat: number;
+        categoryIndex: number;
+        pageInCategory: number;
+        totalPagesInCategory: number;
         cells: (RoaCharacter | null)[];
         startCharIndex: number;
     };
     selected: Set<string>;
     dragOverKey: string | null;
     dndMode: DndMode;
-    onCellClick: (catIndex: number, charIndex: number, e: React.MouseEvent) => void;
-    onDragStart: (e: React.DragEvent, catIndex: number, charIndex: number) => void;
-    onDragOver: (e: React.DragEvent, catIndex: number, charIndex: number) => void;
+    onCellClick: (categoryIndex: number, charIndex: number, e: React.MouseEvent) => void;
+    onDragStart: (e: React.DragEvent, categoryIndex: number, charIndex: number) => void;
+    onDragOver: (e: React.DragEvent, categoryIndex: number, charIndex: number) => void;
     onDragLeave: () => void;
-    onDrop: (e: React.DragEvent, toCatIndex: number, toCharIndex: number) => void;
+    onDrop: (e: React.DragEvent, toCategoryIndex: number, toCharIndex: number) => void;
     onOpenFolder: (char: RoaCharacter) => void;
-    cellKey: (catIndex: number, charIndex: number) => string;
+    cellKey: (categoryIndex: number, charIndex: number) => string;
 }): JSX.Element {
     const rows: (RoaCharacter | null)[][] = [];
     for (let r = 0; r < ROWS; r++) {
@@ -696,21 +696,21 @@ function PageGrid({
     return (
         <div className="page-grid">
             <div className="page-label">
-                Page {page.pageInCat + 1} / {page.totalPagesInCat}
+                Page {page.pageInCategory + 1} / {page.totalPagesInCategory}
             </div>
             <div className="page-rows">
                 {rows.map((row, ri) => (
                     <div key={ri} className="page-row">
-                        {row.map((cell, ci) => {
-                            const cellIdx = ci * ROWS + ri;
+                        {row.map((cell, col) => {
+                            const cellIdx = col * ROWS + ri;
                             const charIndex = page.startCharIndex + cellIdx;
                             const isFilled = cell !== null;
                             const key = isFilled
-                                ? cellKeyFn(page.catIndex, charIndex)
-                                : `empty-${page.catIndex}-${page.pageInCat}-${cellIdx}`;
-                            const isSelected = isFilled && selected.has(cellKeyFn(page.catIndex, charIndex));
+                                ? cellKeyFn(page.categoryIndex, charIndex)
+                                : `empty-${page.categoryIndex}-${page.pageInCategory}-${cellIdx}`;
+                            const isSelected = isFilled && selected.has(cellKeyFn(page.categoryIndex, charIndex));
                             const isDragTarget =
-                                dragOverKey === cellKeyFn(page.catIndex, charIndex);
+                                dragOverKey === cellKeyFn(page.categoryIndex, charIndex);
 
                             if (!isFilled) {
                                 return (
@@ -720,7 +720,7 @@ function PageGrid({
                                         onDragOver={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            onDragOver(e, page.catIndex, charIndex);
+                                            onDragOver(e, page.categoryIndex, charIndex);
                                         }}
                                         onDragLeave={(e) => {
                                             e.stopPropagation();
@@ -728,7 +728,7 @@ function PageGrid({
                                         }}
                                         onDrop={(e) => {
                                             e.stopPropagation();
-                                            onDrop(e, page.catIndex, charIndex);
+                                            onDrop(e, page.categoryIndex, charIndex);
                                         }}
                                     />
                                 );
@@ -751,13 +751,13 @@ function PageGrid({
                                     draggable
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        onCellClick(page.catIndex, charIndex, e);
+                                        onCellClick(page.categoryIndex, charIndex, e);
                                     }}
-                                    onDragStart={(e) => onDragStart(e, page.catIndex, charIndex)}
+                                    onDragStart={(e) => onDragStart(e, page.categoryIndex, charIndex)}
                                     onDragOver={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        onDragOver(e, page.catIndex, charIndex);
+                                        onDragOver(e, page.categoryIndex, charIndex);
                                     }}
                                     onDragLeave={(e) => {
                                         e.stopPropagation();
@@ -765,7 +765,7 @@ function PageGrid({
                                     }}
                                     onDrop={(e) => {
                                         e.stopPropagation();
-                                        onDrop(e, page.catIndex, charIndex);
+                                        onDrop(e, page.categoryIndex, charIndex);
                                     }}
                                 >
                                     <img
