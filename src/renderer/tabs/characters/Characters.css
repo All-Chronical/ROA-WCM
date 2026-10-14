@@ -72,6 +72,24 @@
     user-select: none;
 }
 
+.collapse-btn {
+    padding: 2px;
+    margin-right: 4px;
+}
+
+.collapse-btn .material-icons {
+    font-size: 16px;
+    transition: transform 0.15s;
+}
+
+.collapse-btn.collapsed .material-icons {
+    transform: rotate(-90deg);
+}
+
+.category-bundle.collapsed .category-header {
+    border-radius: 4px;
+}
+
 .category-title {
     font-weight: bold;
     font-size: 11pt;

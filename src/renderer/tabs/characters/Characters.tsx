@@ -37,6 +37,9 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
     const [newCatName, setNewCatName] = useState<string | null>(null);
     const [renamingCat, setRenamingCat] = useState<{ index: number; name: string } | null>(null);
 
+    // Collapsed categories: set of catIndex
+    const [collapsedCats, setCollapsedCats] = useState<Set<number>>(new Set<number>());
+
     const categoriesRef = useRef(categories);
     categoriesRef.current = categories;
 
@@ -48,6 +51,7 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
             setCategories(cats);
             setSelected(new Set<string>());
             setLastSelected(null);
+            setCollapsedCats(new Set<number>());
             setIsDirty(false);
             log(`Loaded ${cats.length} categories`);
         } catch (err: any) {
@@ -364,6 +368,18 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
         setNewCatName(null);
     }
 
+    function toggleCatCollapsed(catIndex: number): void {
+        setCollapsedCats((prev) => {
+            const next = new Set<number>(prev);
+            if (next.has(catIndex)) {
+                next.delete(catIndex);
+            } else {
+                next.add(catIndex);
+            }
+            return next;
+        });
+    }
+
     function renameCategory(catIndex: number): void {
         setRenamingCat({ index: catIndex, name: categories[catIndex].name });
     }
@@ -491,6 +507,8 @@ export function TabCharacters({ log }: TabCharactersProps): JSX.Element {
                                     onDragLeave={handleDragLeave}
                                     onDrop={handleDrop}
                                     onRename={renameCategory}
+                                    isCollapsed={collapsedCats.has(bundle.catIndex)}
+                                    onToggleCollapse={() => toggleCatCollapsed(bundle.catIndex)}
                                     renamingCat={renamingCat}
                                     onRenamingChange={(name) => setRenamingCat(renamingCat ? { ...renamingCat, name } : null)}
                                     onRenameCommit={commitRenameCategory}
@@ -536,6 +554,8 @@ function CategoryBundle({
     onDragLeave,
     onDrop,
     onRename,
+    isCollapsed,
+    onToggleCollapse,
     renamingCat,
     onRenamingChange,
     onRenameCommit,
@@ -554,6 +574,8 @@ function CategoryBundle({
     onDragLeave: () => void;
     onDrop: (e: React.DragEvent, toCatIndex: number, toCharIndex: number) => void;
     onRename: (catIndex: number) => void;
+    isCollapsed: boolean;
+    onToggleCollapse: () => void;
     renamingCat: { index: number; name: string } | null;
     onRenamingChange: (name: string) => void;
     onRenameCommit: () => void;
@@ -563,7 +585,7 @@ function CategoryBundle({
 }): JSX.Element {
     const isRenaming = renamingCat !== null && renamingCat.index === bundle.catIndex;
     return (
-        <div className="category-bundle" onClick={(e) => e.stopPropagation()}>
+        <div className={`category-bundle ${isCollapsed ? "collapsed" : ""}`} onClick={(e) => e.stopPropagation()}>
             <div className="category-header">
                 {isRenaming ? (
                     <input
@@ -579,6 +601,13 @@ function CategoryBundle({
                     />
                 ) : (
                     <>
+                        <button
+                            className={`icon-btn collapse-btn ${isCollapsed ? "collapsed" : ""}`}
+                            onClick={onToggleCollapse}
+                            title={isCollapsed ? "Expand category" : "Collapse category"}
+                        >
+                            <span className="material-icons">expand_more</span>
+                        </button>
                         <span className="category-title">{bundle.catName}</span>
                         <span className="category-count">{bundle.charCount} characters</span>
                         <button
@@ -591,33 +620,35 @@ function CategoryBundle({
                     </>
                 )}
             </div>
-            <div
-                className="category-pages"
-                onDragOver={(e) => {
-                    e.preventDefault();
-                    onDragOver(e, bundle.catIndex, categories[bundle.catIndex].characters.length);
-                }}
-                onDrop={(e) => {
-                    onDrop(e, bundle.catIndex, categories[bundle.catIndex].characters.length);
-                }}
-            >
-                {bundle.pages.map((page, pi) => (
-                    <PageGrid
-                        key={pi}
-                        page={page}
-                        selected={selected}
-                        dragOverKey={dragOverKey}
-                        dndMode={dndMode}
-                        onCellClick={onCellClick}
-                        onDragStart={onDragStart}
-                        onDragOver={onDragOver}
-                        onDragLeave={onDragLeave}
-                        onDrop={onDrop}
-                        onOpenFolder={onOpenFolder}
-                        cellKey={cellKeyFn}
-                    />
-                ))}
-            </div>
+            {!isCollapsed && (
+                <div
+                    className="category-pages"
+                    onDragOver={(e) => {
+                        e.preventDefault();
+                        onDragOver(e, bundle.catIndex, categories[bundle.catIndex].characters.length);
+                    }}
+                    onDrop={(e) => {
+                        onDrop(e, bundle.catIndex, categories[bundle.catIndex].characters.length);
+                    }}
+                >
+                    {bundle.pages.map((page, pi) => (
+                        <PageGrid
+                            key={pi}
+                            page={page}
+                            selected={selected}
+                            dragOverKey={dragOverKey}
+                            dndMode={dndMode}
+                            onCellClick={onCellClick}
+                            onDragStart={onDragStart}
+                            onDragOver={onDragOver}
+                            onDragLeave={onDragLeave}
+                            onDrop={onDrop}
+                            onOpenFolder={onOpenFolder}
+                            cellKey={cellKeyFn}
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
