@@ -34,6 +34,7 @@
     "webpack": "^5.89.0"
   },
   "dependencies": {
+    "electron-forge": "^5.2.4",
     "electron-squirrel-startup": "^1.0.0",
     "fs-extra": "^11.2.0",
     "ini": "^4.1.1",
