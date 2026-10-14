@@ -24,6 +24,7 @@
  ## Release 2
  - [ ] App icon
  - [ ] Make categories collapsible
+ - [ ] Make categories movable by drag
  - [ ] In-app warning if .roa files don't exist
  - [ ] Stash panel on the right (can't save with anything stashed)
 
