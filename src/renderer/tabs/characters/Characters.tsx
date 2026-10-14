@@ -657,7 +657,9 @@ function PageGrid({
 }): JSX.Element {
     const rows: (RoaCharacter | null)[][] = [];
     for (let r = 0; r < ROWS; r++) {
-        rows.push(page.cells.slice(r * COLS, r * COLS + COLS));
+        rows.push(
+            Array.from({ length: COLS }, (_, c) => page.cells[c * ROWS + r])
+        );
     }
 
     return (
@@ -669,7 +671,7 @@ function PageGrid({
                 {rows.map((row, ri) => (
                     <div key={ri} className="page-row">
                         {row.map((cell, ci) => {
-                            const cellIdx = ri * COLS + ci;
+                            const cellIdx = ci * ROWS + ri;
                             const charIndex = page.startCharIndex + cellIdx;
                             const isFilled = cell !== null;
                             const key = isFilled
@@ -709,7 +711,7 @@ function PageGrid({
                                         isSelected ? "selected" : "",
                                         isDragTarget
                                             ? dndMode === "insert"
-                                                ? "drag-over-left"
+                                                ? "drag-over-top"
                                                 : "drag-over-on"
                                             : "",
                                     ]
